@@ -61,7 +61,7 @@ public:
     // created and *then* the blackboard is set.
     if (!initialized_) {
       // Get the required items from the blackboard
-      node_ = blackboard()->template get<rclcpp::Node::SharedPtr>("node");
+      node_ = blackboard()->template get<nav2_lifecycle::LifecycleNode::SharedPtr>("node");
       node_loop_timeout_ =
         blackboard()->template get<std::chrono::milliseconds>("node_loop_timeout");
 
@@ -115,7 +115,7 @@ protected:
   typename std::unique_ptr<nav2_tasks::TaskClient<CommandMsg, ResultMsg>> task_client_;
 
   // The node that will be used for any ROS operations
-  rclcpp::Node::SharedPtr node_;
+  nav2_lifecycle::LifecycleNode::SharedPtr node_;
 
   // The timeout value while to use in the tick loop while waiting for
   // a result from the server

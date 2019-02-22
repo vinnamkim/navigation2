@@ -15,6 +15,8 @@
 #ifndef NAV2_TASKS__GLOBAL_LOCALIZATION_SERVICE_CLIENT_HPP_
 #define NAV2_TASKS__GLOBAL_LOCALIZATION_SERVICE_CLIENT_HPP_
 
+#include <string>
+
 #include "nav2_tasks/service_client.hpp"
 #include "std_srvs/srv/empty.hpp"
 
@@ -24,8 +26,8 @@ namespace nav2_tasks
 class globalLocalizationServiceClient : public ServiceClient<std_srvs::srv::Empty>
 {
 public:
-  globalLocalizationServiceClient()
-  : ServiceClient<std_srvs::srv::Empty>("global_localization")
+  globalLocalizationServiceClient(const std::string & parent_node_name)
+  : ServiceClient<std_srvs::srv::Empty>(parent_node_name, "global_localization")
   {
   }
 

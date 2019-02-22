@@ -15,8 +15,11 @@
 #ifndef NAV2_TASKS__MAP_SERVICE_CLIENT_HPP_
 #define NAV2_TASKS__MAP_SERVICE_CLIENT_HPP_
 
+#include <string>
+
 #include "nav2_tasks/service_client.hpp"
 #include "nav_msgs/srv/get_map.hpp"
+#include "nav_msgs/msg/occupancy_grid.hpp"
 
 namespace nav2_tasks
 {
@@ -24,9 +27,27 @@ namespace nav2_tasks
 class MapServiceClient : public ServiceClient<nav_msgs::srv::GetMap>
 {
 public:
-  MapServiceClient()
-  : ServiceClient<nav_msgs::srv::GetMap>("map")
+  MapServiceClient(const std::string & parent_node_name)
+  : ServiceClient<nav_msgs::srv::GetMap>(parent_node_name, "map")
   {
+  }
+
+  MapServiceClient(rclcpp::Node::SharedPtr node)
+  : ServiceClient<nav_msgs::srv::GetMap>(node, "map")
+  {
+  }
+
+  bool getMap(nav_msgs::msg::OccupancyGrid & map)
+  {
+    auto request = std::make_shared<nav2_tasks::MapServiceClient::MapServiceRequest>();
+    auto response = std::make_shared<nav2_tasks::MapServiceClient::MapServiceResponse>();
+
+    bool rc = invoke(request, response);
+    if (rc) {
+      map = response->map;
+    }
+
+    return rc;
   }
 
   using MapServiceRequest = ServiceClient<nav_msgs::srv::GetMap>::RequestType;

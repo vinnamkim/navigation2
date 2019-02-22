@@ -29,14 +29,14 @@ using std::shared_ptr;
 using std::any_of;
 using ClearExceptRegion = nav2_msgs::srv::ClearCostmapExceptRegion;
 
-ClearCostmapService::ClearCostmapService(rclcpp::Node::SharedPtr & node, Costmap2DROS & costmap)
+ClearCostmapService::ClearCostmapService(nav2_lifecycle::LifecycleNode::SharedPtr node, Costmap2DROS & costmap)
 : node_(node), costmap_(costmap)
 {
   reset_value_ = costmap_.getCostmap()->getDefaultValue();
 
   node_->get_parameter_or_set("clearable_layers", clearable_layers_, {"obstacle_layer"});
 
-  server_ = node_->create_service<ClearExceptRegion>("clear_except_" + costmap_.getName(),
+  server_ = node_->create_service<ClearExceptRegion>("clear_except_" + std::string(costmap_.get_name()),
       std::bind(&ClearCostmapService::clearExceptRegionCallback, this,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
@@ -46,7 +46,7 @@ void ClearCostmapService::clearExceptRegionCallback(
   const shared_ptr<ClearExceptRegion::Request> request,
   const shared_ptr<ClearExceptRegion::Response>/*response*/)
 {
-  RCLCPP_INFO(node_->get_logger(), "Received request to clear " + costmap_.getName());
+  RCLCPP_INFO(node_->get_logger(), "Received request to clear %s", costmap_.get_name());
 
   clearExceptRegion(request->reset_distance);
 }

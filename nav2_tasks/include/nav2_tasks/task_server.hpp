@@ -20,9 +20,12 @@
 #include <thread>
 #include <string>
 #include <chrono>
+
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/empty.hpp"
 #include "nav2_tasks/task_status.hpp"
+#include "nav2_lifecycle/lifecycle_node.hpp"
+#include "nav2_lifecycle/lifecycle.hpp"
 
 namespace nav2_tasks
 {
@@ -31,16 +34,24 @@ template<class CommandMsg, class ResultMsg>
 const char * getTaskName();
 
 template<class CommandMsg, class ResultMsg>
-class TaskServer
+class TaskServer: public nav2_lifecycle::ILifecycle
 {
 public:
-  explicit TaskServer(rclcpp::Node::SharedPtr & node, bool autoStart = true)
+  explicit TaskServer(nav2_lifecycle::LifecycleNode::SharedPtr node)
   : node_(node),
     workerThread_(nullptr),
     commandReceived_(false),
     updateReceived_(false),
     cancelReceived_(false),
     eptr_(nullptr)
+  {
+  }
+
+  virtual ~TaskServer()
+  {
+  }
+
+  nav2_lifecycle::CallbackReturn onConfigure(const rclcpp_lifecycle::State &) override
   {
     std::string taskName = getTaskName<CommandMsg, ResultMsg>();
 
@@ -57,21 +68,52 @@ public:
     statusPub_ = node_->create_publisher<StatusMsg>(taskName + "_status");
 
     execute_callback_ = [this](const typename CommandMsg::SharedPtr) {
-        printf("Execute callback not set!\n");
         return TaskStatus::FAILED;
       };
 
-    if (autoStart) {
-      startWorkerThread();
-    }
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
   }
 
-  virtual ~TaskServer()
+  nav2_lifecycle::CallbackReturn onActivate(const rclcpp_lifecycle::State &) override
+  {
+    commandReceived_ = false;
+    updateReceived_ = false;
+    cancelReceived_ = false;
+    eptr_ = nullptr;
+
+    resultPub_->on_activate();
+    statusPub_->on_activate();
+
+    startWorkerThread();
+
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+  }
+
+  nav2_lifecycle::CallbackReturn onDeactivate(const rclcpp_lifecycle::State &) override
   {
     stopWorkerThread();
+
+    resultPub_->on_deactivate();
+    statusPub_->on_deactivate();
+
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+  }
+
+  nav2_lifecycle::CallbackReturn onCleanup(const rclcpp_lifecycle::State &) override
+  {
+    clearExecuteCallback();
+
+    commandSub_.reset();
+    updateSub_.reset();
+    cancelSub_.reset();
+    resultPub_.reset();
+    statusPub_ .reset();
+
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
   }
 
   typedef std::function<TaskStatus(const typename CommandMsg::SharedPtr command)> ExecuteCallback;
+
   void setExecuteCallback(ExecuteCallback execute_callback)
   {
     execute_callback_ = execute_callback;
@@ -108,13 +150,8 @@ public:
     resultMsg_ = result;
   }
 
-  void startWorkerThread()
-  {
-    workerThread_ = new std::thread(&TaskServer::workerThread, this);
-  }
-
 protected:
-  rclcpp::Node::SharedPtr node_;
+  nav2_lifecycle::LifecycleNode::SharedPtr node_;
 
   ExecuteCallback execute_callback_;
 
@@ -126,12 +163,39 @@ protected:
   typedef std_msgs::msg::Empty CancelMsg;
   typedef nav2_msgs::msg::TaskStatus StatusMsg;
 
+  void clearExecuteCallback()
+  {
+    execute_callback_ = nullptr; //[this](const typename CommandMsg::SharedPtr) {
+      //return TaskStatus::FAILED;
+    //};
+  }
+
   // The pointer to our private worker thread
   std::thread * workerThread_;
+
+  void startWorkerThread()
+  {
+    workerThread_ = new std::thread(&TaskServer::workerThread, this);
+  }
+
+  void stopWorkerThread()
+  {
+    shouldExit = true;
+    workerThread_->join();
+    delete workerThread_;
+    workerThread_ = nullptr;
+
+    // If there was an exception during execution, rethrow the exception so
+    // that the owning thread (the thread that created this object) receives it
+    if (eptr_ != nullptr) {
+      std::rethrow_exception(eptr_);
+    }
+  }
 
   // This class has the worker thread body which calls the user's execute() callback
   void workerThread()
   {
+    shouldExit = false;
     do {
       std::unique_lock<std::mutex> lock(commandMutex_);
       if (cvCommand_.wait_for(lock, std::chrono::milliseconds(100),
@@ -185,23 +249,7 @@ protected:
           throw std::logic_error("Unexpected status return from task");
         }
       }
-    } while (rclcpp::ok());
-  }
-
-  // TODO(mjeronimo): Make explicit start and stop calls to control
-  // the worker thread
-
-  void stopWorkerThread()
-  {
-    workerThread_->join();
-    delete workerThread_;
-    workerThread_ = nullptr;
-
-    // If there was an exception during execution, rethrow the exception so
-    // that the owning thread (the thread that created this object) receives it
-    if (eptr_ != nullptr) {
-      std::rethrow_exception(eptr_);
-    }
+    } while (rclcpp::ok() && !shouldExit);
   }
 
   // Variables to handle the communication of the command to the execute thread
@@ -210,6 +258,7 @@ protected:
   std::condition_variable cvCommand_;
   std::atomic<bool> updateReceived_;
   std::atomic<bool> cancelReceived_;
+  std::atomic<bool> shouldExit;
 
   // The callbacks for our subscribers
   void onCommandReceived(const typename CommandMsg::SharedPtr msg)
@@ -240,8 +289,8 @@ protected:
   rclcpp::Subscription<CancelMsg>::SharedPtr cancelSub_;
 
   // The publishers for the result from this task
-  typename rclcpp::Publisher<ResultMsg>::SharedPtr resultPub_;
-  typename rclcpp::Publisher<StatusMsg>::SharedPtr statusPub_;
+  typename rclcpp_lifecycle::LifecyclePublisher<ResultMsg>::SharedPtr resultPub_;
+  typename rclcpp_lifecycle::LifecyclePublisher<StatusMsg>::SharedPtr statusPub_;
 
   std::exception_ptr eptr_;
 };

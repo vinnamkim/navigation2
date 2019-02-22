@@ -17,6 +17,9 @@
 
 #include <string>
 
+namespace nav2_util
+{
+
 class strutils
 {
 public:
@@ -33,5 +36,7 @@ std::string strutils::stripLeadingSlash(const std::string & in)
 
   return out;
 }
+
+}  // namespace nav2_util
 
 #endif  // NAV2_UTIL__STRUTILS_HPP_
