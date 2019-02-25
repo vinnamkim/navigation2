@@ -62,6 +62,14 @@ public:
     typename RequestType::SharedPtr & request,
     const std::chrono::seconds timeout = std::chrono::seconds::max())
   {
+    while (!client_->wait_for_service(std::chrono::seconds(1))) {
+      if (!rclcpp::ok()) {
+        throw std::runtime_error("ServiceClient: service call interrupted while waiting for service");
+      }
+      RCLCPP_DEBUG(node_->get_logger(), "Waiting for service to appear...");
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "send async request");
     auto future_result = client_->async_send_request(request);
 
     if (rclcpp::spin_until_future_complete(node_, future_result, timeout) !=
@@ -77,6 +85,13 @@ public:
     typename RequestType::SharedPtr & request,
     typename ResponseType::SharedPtr & response)
   {
+    while (!client_->wait_for_service(std::chrono::seconds(1))) {
+      if (!rclcpp::ok()) {
+        throw std::runtime_error("ServiceClient: service call interrupted while waiting for service");
+      }
+      RCLCPP_DEBUG(node_->get_logger(), "Waiting for service to appear...");
+    }
+
     RCLCPP_INFO(node_->get_logger(), "send async request");
     auto future_result = client_->async_send_request(request);
 
@@ -90,15 +105,6 @@ public:
     response = future_result.get();
 
     return true;
-  }
-
-  void waitForService(const std::chrono::seconds timeout = std::chrono::seconds::max())
-  {
-    while (!client_->wait_for_service(timeout)) {
-      if (!rclcpp::ok()) {
-        throw std::runtime_error("waitForServer: interrupted while waiting for service to appear");
-      }
-    }
   }
 
 protected:
