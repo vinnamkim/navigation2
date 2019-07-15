@@ -93,10 +93,15 @@ def generate_launch_description():
         default_value='True',
         description='Whether to run in simulation')
 
+    # declare_world_cmd = launch.actions.DeclareLaunchArgument(
+    #     'world',
+    #     default_value=os.path.join(get_package_share_directory('turtlebot3_gazebo'),
+    #                                'worlds/turtlebot3_worlds/waffle.model'),
+    #     description='Full path to world file to load')
+    
     declare_world_cmd = launch.actions.DeclareLaunchArgument(
         'world',
-        default_value=os.path.join(get_package_share_directory('turtlebot3_gazebo'),
-                                   'worlds/turtlebot3_worlds/waffle.model'),
+        default_value='/home/vinnamkim/nav2_ws/src/navigation2/nav2_system_tests/worlds/turtlebot3_ros2_demo.world',
         description='Full path to world file to load')
 
     stdout_linebuf_envvar = launch.actions.SetEnvironmentVariable(
@@ -223,7 +228,7 @@ def generate_launch_description():
     ld.add_action(start_map_server_cmd)
     ld.add_action(start_localizer_cmd)
     ld.add_action(start_world_model_cmd)
-    ld.add_action(start_dwb_cmd)
+    # ld.add_action(start_dwb_cmd)
     ld.add_action(start_planner_cmd)
     ld.add_action(start_navigator_cmd)
     ld.add_action(start_motion_primitives_cmd)
